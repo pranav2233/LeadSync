@@ -1,13 +1,16 @@
 package com.example.leadsync.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -15,9 +18,13 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.example.leadsync.R
+import com.example.leadsync.sync.DEFAULT_BACKEND_BASE_URL
 import com.example.leadsync.ui.SessionEvent
 import com.example.leadsync.ui.SessionUiState
 
@@ -33,14 +40,24 @@ fun LoginScreen(
             .padding(24.dp),
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(
-            text = "LeadSync Cloud",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Image(
+                painter = painterResource(R.drawable.leadsync_logo),
+                contentDescription = "LeadSync logo",
+                modifier = Modifier.size(64.dp),
+            )
+            Text(
+                text = "LeadSync Cloud",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+            )
+        }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Sign in to keep one account-backed snapshot of your people and interaction history. For the Android emulator, localhost should usually be `http://10.0.2.2:8000`.",
+            text = "Sign in to keep one account-backed snapshot of your people and interaction history. The hosted backend is prefilled, but you can still override it for local development when needed.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -50,7 +67,7 @@ fun LoginScreen(
             onValueChange = { onEvent(SessionEvent.UpdateBaseUrl(it)) },
             modifier = Modifier.fillMaxWidth(),
             label = { Text("Backend URL") },
-            placeholder = { Text("http://10.0.2.2:8000") },
+            placeholder = { Text(DEFAULT_BACKEND_BASE_URL) },
             singleLine = true,
         )
         Spacer(modifier = Modifier.height(12.dp))

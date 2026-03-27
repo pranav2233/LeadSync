@@ -25,6 +25,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.leadsync.data.LeadSyncRepository
 import com.example.leadsync.sync.CloudApiService
+import com.example.leadsync.sync.CloudSyncCoordinator
 import com.example.leadsync.sync.SessionStore
 import com.example.leadsync.ui.screens.DashboardScreen
 import com.example.leadsync.ui.screens.LoginScreen
@@ -59,6 +60,7 @@ fun LeadSyncApp(
     repository: LeadSyncRepository,
     sessionStore: SessionStore,
     cloudApiService: CloudApiService,
+    cloudSyncCoordinator: CloudSyncCoordinator,
     navController: NavHostController = rememberNavController(),
 ) {
     val sessionViewModel: SessionViewModel = viewModel(
@@ -134,7 +136,7 @@ fun LeadSyncApp(
 
             composable(TopLevelDestination.PEOPLE.baseRoute) {
                 val viewModel: PeopleViewModel = viewModel(
-                    factory = PeopleViewModel.factory(repository),
+                    factory = PeopleViewModel.factory(repository, cloudSyncCoordinator),
                 )
                 val uiState by viewModel.uiState.collectAsStateWithLifecycle()
                 PeopleScreen(
@@ -149,12 +151,18 @@ fun LeadSyncApp(
                 val editingMeetingId = backStack.arguments?.getString("meetingId")?.toLongOrNull()
                 val viewModel: MeetingEditorViewModel = viewModel(
                     key = "meeting-editor-${editingMeetingId ?: "new"}-${preselectedPersonId ?: "none"}",
-                    factory = MeetingEditorViewModel.factory(repository, preselectedPersonId, editingMeetingId),
+                    factory = MeetingEditorViewModel.factory(
+                        repository = repository,
+                        cloudSyncCoordinator = cloudSyncCoordinator,
+                        preselectedPersonId = preselectedPersonId,
+                        editingMeetingId = editingMeetingId,
+                    ),
                 )
                 val uiState by viewModel.uiState.collectAsStateWithLifecycle()
                 MeetingEditorScreen(
                     uiState = uiState,
                     onEvent = viewModel::onEvent,
+                    onNavigateUp = { navController.popBackStack() },
                 )
             }
 

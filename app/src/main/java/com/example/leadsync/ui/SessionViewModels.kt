@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.leadsync.data.LeadSyncRepository
 import com.example.leadsync.sync.CloudApiService
+import com.example.leadsync.sync.DEFAULT_BACKEND_BASE_URL
 import com.example.leadsync.sync.SessionStore
 import com.example.leadsync.sync.StoredSession
 import com.example.leadsync.sync.toCloudSnapshot
@@ -20,7 +21,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class SessionFormState(
-    val baseUrl: String = "http://10.0.2.2:8000",
+    val baseUrl: String = DEFAULT_BACKEND_BASE_URL,
     val email: String = "",
     val password: String = "",
     val isWorking: Boolean = false,
@@ -29,7 +30,7 @@ data class SessionFormState(
 
 data class SessionUiState(
     val session: StoredSession? = null,
-    val baseUrl: String = "http://10.0.2.2:8000",
+    val baseUrl: String = DEFAULT_BACKEND_BASE_URL,
     val email: String = "",
     val password: String = "",
     val isWorking: Boolean = false,
@@ -55,7 +56,11 @@ class SessionViewModel(
     private val sessionStore: SessionStore,
     private val cloudApiService: CloudApiService,
 ) : ViewModel() {
-    private val formState = MutableStateFlow(SessionFormState())
+    private val formState = MutableStateFlow(
+        SessionFormState(
+            baseUrl = sessionStore.session.value?.baseUrl ?: DEFAULT_BACKEND_BASE_URL,
+        ),
+    )
 
     val uiState: StateFlow<SessionUiState> = combine(
         sessionStore.session,
@@ -108,14 +113,15 @@ class SessionViewModel(
                     cloudApiService.login(form.baseUrl, form.email, form.password)
                 }
                 sessionStore.save(session)
+                val message = if (register) {
+                    "Account created. Cloud sync is ready."
+                } else {
+                    restoreSnapshotAfterLogin(session)
+                }
                 formState.value = SessionFormState(
                     baseUrl = session.baseUrl,
                     email = session.email,
-                    message = if (register) {
-                        "Account created. Cloud sync is ready."
-                    } else {
-                        "Signed in. Use Pull cloud to restore or Push cloud to back up this device."
-                    },
+                    message = message,
                 )
             } catch (error: Exception) {
                 formState.update {
@@ -125,6 +131,20 @@ class SessionViewModel(
                     )
                 }
             }
+        }
+    }
+
+    private suspend fun restoreSnapshotAfterLogin(session: StoredSession): String {
+        return try {
+            val snapshot = cloudApiService.pullSnapshot(session)
+            if (snapshot == null) {
+                "Signed in. No cloud backup found for this account."
+            } else {
+                repository.replaceSnapshot(snapshot.toLocalSnapshot())
+                "Signed in. Cloud backup restored to this device."
+            }
+        } catch (error: Exception) {
+            "Signed in, but cloud restore failed: ${error.message ?: "Unable to reach the backend."}"
         }
     }
 

@@ -1,5 +1,11 @@
 package com.example.leadsync.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -10,11 +16,13 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -23,6 +31,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.Clear
+import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.PersonAdd
@@ -32,6 +43,8 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -45,6 +58,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -57,6 +72,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,6 +90,8 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.painterResource
+import com.example.leadsync.R
 import com.example.leadsync.data.ActionItemSummaryRow
 import com.example.leadsync.data.ActionStatus
 import com.example.leadsync.data.MeetingRecord
@@ -88,8 +106,14 @@ import com.example.leadsync.ui.PeopleEvent
 import com.example.leadsync.ui.PeopleUiState
 import com.example.leadsync.ui.PersonDetailUiState
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+
+private enum class PeopleTab {
+    REPORTEES,
+    STAKEHOLDERS,
+}
 
 @Composable
 fun DashboardScreen(
@@ -104,132 +128,298 @@ fun DashboardScreen(
     onLogMeeting: (Long?) -> Unit,
     onOpenPerson: (Long) -> Unit,
 ) {
-    LazyColumn(
+    var isProfilePanelOpen by rememberSaveable { mutableStateOf(false) }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface),
-        contentPadding = PaddingValues(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "LeadSync",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = "Track recurring 1:1s, stakeholder syncs, feedback, and follow-through in one place.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = "Cloud account: $cloudEmail",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedButton(onClick = onOpenPeople) {
-                        Icon(Icons.Outlined.Groups, contentDescription = null)
-                        Spacer(modifier = Modifier.size(8.dp))
-                        Text("Manage people")
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item {
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.padding(end = 52.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Image(
+                            painter = painterResource(R.drawable.leadsync_logo),
+                            contentDescription = "LeadSync logo",
+                            modifier = Modifier.size(68.dp),
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = "LeadSync",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                text = "Track recurring 1:1s, stakeholder syncs, feedback, and follow-through in one place.",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
-                    Button(onClick = { onLogMeeting(null) }) {
-                        Icon(Icons.Outlined.Add, contentDescription = null)
-                        Spacer(modifier = Modifier.size(8.dp))
-                        Text("Log interaction")
+
+                    IconButton(
+                        onClick = { isProfilePanelOpen = true },
+                        modifier = Modifier.align(Alignment.TopEnd),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.AccountCircle,
+                            contentDescription = "Open account panel",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(30.dp),
+                        )
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedButton(onClick = onPullSync, enabled = !isSyncing) {
-                        Text(if (isSyncing) "Working..." else "Pull cloud")
-                    }
-                    OutlinedButton(onClick = onPushSync, enabled = !isSyncing) {
-                        Text(if (isSyncing) "Working..." else "Push cloud")
-                    }
-                    TextButton(onClick = onLogout, enabled = !isSyncing) {
-                        Text("Logout")
-                    }
+            }
+
+            item {
+                SummaryGrid(
+                    cards = listOf(
+                        SummaryCardData("People", uiState.totalPeople.toString(), "Across reportees and stakeholders"),
+                        SummaryCardData("Reportees", uiState.reporteeCount.toString(), "Direct reports with 1:1 history"),
+                        SummaryCardData("Stakeholders", uiState.stakeholderCount.toString(), "Cross-functional collaborators"),
+                        SummaryCardData("Open actions", uiState.openActionItems.toString(), "Items still in progress or blocked"),
+                    ),
+                )
+            }
+
+            item {
+                SectionTitle("Due this week")
+            }
+
+            if (uiState.dueThisWeek.isEmpty()) {
+                item {
+                    EmptyStateCard(
+                        title = "No action items due this week",
+                        body = "Use the meeting form to capture owners, deadlines, and progress after every conversation.",
+                    )
                 }
-                cloudStatus?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+            } else {
+                items(uiState.dueThisWeek) { item ->
+                    ActionItemCard(item = item, onOpenPerson = onOpenPerson)
+                }
+            }
+
+            item {
+                SectionTitle("Recent feedback")
+            }
+
+            if (uiState.feedbackHighlights.isEmpty()) {
+                item {
+                    EmptyStateCard(
+                        title = "No feedback logged yet",
+                        body = "Capture feedback in the moment so you can reference it during future check-ins.",
+                    )
+                }
+            } else {
+                items(uiState.feedbackHighlights) { meeting ->
+                    HighlightCard(
+                        title = meeting.personName,
+                        subtitle = "${meeting.meeting.interactionType} • ${formatDate(meeting.meeting.scheduledAt)}",
+                        body = meeting.meeting.feedback,
+                        onClick = { onOpenPerson(meeting.meeting.personId) },
+                    )
+                }
+            }
+
+            item {
+                SectionTitle("Recent interactions")
+            }
+
+            if (uiState.recentMeetings.isEmpty()) {
+                item {
+                    EmptyStateCard(
+                        title = "No interactions captured yet",
+                        body = "Once you log a 1:1 or stakeholder sync, the latest occurrences will show here.",
+                    )
+                }
+            } else {
+                items(uiState.recentMeetings) { meeting ->
+                    HighlightCard(
+                        title = meeting.personName,
+                        subtitle = "${meeting.meeting.interactionType} • ${formatDate(meeting.meeting.scheduledAt)}",
+                        body = meeting.meeting.progressSummary.ifBlank { meeting.meeting.agenda.ifBlank { "No notes recorded." } },
+                        onClick = { onOpenPerson(meeting.meeting.personId) },
                     )
                 }
             }
         }
 
-        item {
-            SummaryGrid(
-                cards = listOf(
-                    SummaryCardData("People", uiState.totalPeople.toString(), "Across reportees and stakeholders"),
-                    SummaryCardData("Reportees", uiState.reporteeCount.toString(), "Direct reports with 1:1 history"),
-                    SummaryCardData("Stakeholders", uiState.stakeholderCount.toString(), "Cross-functional collaborators"),
-                    SummaryCardData("Open actions", uiState.openActionItems.toString(), "Items still in progress or blocked"),
-                ),
+        AnimatedVisibility(
+            visible = isProfilePanelOpen,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.32f))
+                    .clickable { isProfilePanelOpen = false },
             )
         }
 
-        item {
-            SectionTitle("Due this week")
+        AnimatedVisibility(
+            visible = isProfilePanelOpen,
+            enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
+            exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut(),
+            modifier = Modifier.align(Alignment.CenterEnd),
+        ) {
+            DashboardProfilePanel(
+                cloudEmail = cloudEmail,
+                cloudStatus = cloudStatus,
+                isSyncing = isSyncing,
+                onDismiss = { isProfilePanelOpen = false },
+                onOpenPeople = {
+                    isProfilePanelOpen = false
+                    onOpenPeople()
+                },
+                onLogInteraction = {
+                    isProfilePanelOpen = false
+                    onLogMeeting(null)
+                },
+                onPullSync = {
+                    isProfilePanelOpen = false
+                    onPullSync()
+                },
+                onPushSync = {
+                    isProfilePanelOpen = false
+                    onPushSync()
+                },
+                onLogout = {
+                    isProfilePanelOpen = false
+                    onLogout()
+                },
+            )
         }
+    }
+}
 
-        if (uiState.dueThisWeek.isEmpty()) {
-            item {
-                EmptyStateCard(
-                    title = "No action items due this week",
-                    body = "Use the meeting form to capture owners, deadlines, and progress after every conversation.",
-                )
-            }
-        } else {
-            items(uiState.dueThisWeek) { item ->
-                ActionItemCard(item = item, onOpenPerson = onOpenPerson)
-            }
-        }
+@Composable
+private fun DashboardProfilePanel(
+    cloudEmail: String,
+    cloudStatus: String?,
+    isSyncing: Boolean,
+    onDismiss: () -> Unit,
+    onOpenPeople: () -> Unit,
+    onLogInteraction: () -> Unit,
+    onPullSync: () -> Unit,
+    onPushSync: () -> Unit,
+    onLogout: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxHeight()
+            .width(312.dp),
+        shape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 12.dp,
+        shadowElevation = 12.dp,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Account",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        IconButton(onClick = onDismiss) {
+                            Icon(
+                                imageVector = Icons.Outlined.Clear,
+                                contentDescription = "Close account panel",
+                            )
+                        }
+                    }
 
-        item {
-            SectionTitle("Recent feedback")
-        }
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Text(
+                                text = cloudEmail,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                text = "Cloud sync account",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            cloudStatus?.takeIf { it.isNotBlank() }?.let {
+                                Text(
+                                    text = it,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
+                    }
 
-        if (uiState.feedbackHighlights.isEmpty()) {
-            item {
-                EmptyStateCard(
-                    title = "No feedback logged yet",
-                    body = "Capture feedback in the moment so you can reference it during future check-ins.",
-                )
-            }
-        } else {
-            items(uiState.feedbackHighlights) { meeting ->
-                HighlightCard(
-                    title = meeting.personName,
-                    subtitle = "${meeting.meeting.interactionType} • ${formatDate(meeting.meeting.scheduledAt)}",
-                    body = meeting.meeting.feedback,
-                    onClick = { onOpenPerson(meeting.meeting.personId) },
-                )
-            }
-        }
+                    Button(
+                        onClick = onOpenPeople,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Outlined.Groups, contentDescription = null)
+                        Spacer(modifier = Modifier.size(8.dp))
+                        Text("Manage people")
+                    }
 
-        item {
-            SectionTitle("Recent interactions")
-        }
+                    Button(
+                        onClick = onLogInteraction,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Outlined.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.size(8.dp))
+                        Text("Log interaction")
+                    }
 
-        if (uiState.recentMeetings.isEmpty()) {
-            item {
-                EmptyStateCard(
-                    title = "No interactions captured yet",
-                    body = "Once you log a 1:1 or stakeholder sync, the latest occurrences will show here.",
-                )
-            }
-        } else {
-            items(uiState.recentMeetings) { meeting ->
-                HighlightCard(
-                    title = meeting.personName,
-                    subtitle = "${meeting.meeting.interactionType} • ${formatDate(meeting.meeting.scheduledAt)}",
-                    body = meeting.meeting.progressSummary.ifBlank { meeting.meeting.agenda.ifBlank { "No notes recorded." } },
-                    onClick = { onOpenPerson(meeting.meeting.personId) },
-                )
+                    OutlinedButton(
+                        onClick = onPullSync,
+                        enabled = !isSyncing,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(if (isSyncing) "Working..." else "Pull cloud")
+                    }
+
+                    OutlinedButton(
+                        onClick = onPushSync,
+                        enabled = !isSyncing,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(if (isSyncing) "Working..." else "Push cloud")
+                    }
+                }
+
+            TextButton(
+                onClick = onLogout,
+                enabled = !isSyncing,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Logout")
             }
         }
     }
@@ -243,6 +433,13 @@ fun PeopleScreen(
     onOpenPerson: (Long) -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    var selectedTab by rememberSaveable { mutableStateOf(PeopleTab.REPORTEES) }
+    val filteredPeople = uiState.people.filter { person ->
+        when (selectedTab) {
+            PeopleTab.REPORTEES -> person.type == PersonType.REPORTEE
+            PeopleTab.STAKEHOLDERS -> person.type == PersonType.STAKEHOLDER
+        }
+    }
 
     LaunchedEffect(uiState.form.message) {
         uiState.form.message?.let {
@@ -287,19 +484,60 @@ fun PeopleScreen(
                 )
             }
         } else {
-            LazyColumn(
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
-                contentPadding = PaddingValues(20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                items(uiState.people) { person ->
-                    PersonCard(
-                        person = person,
-                        onClick = { onOpenPerson(person.id) },
-                        onEdit = { onEvent(PeopleEvent.EditPerson(person)) },
-                    )
+                TabRow(selectedTabIndex = selectedTab.ordinal) {
+                    PeopleTab.entries.forEach { tab ->
+                        Tab(
+                            selected = selectedTab == tab,
+                            onClick = { selectedTab = tab },
+                            text = {
+                                Text(
+                                    when (tab) {
+                                        PeopleTab.REPORTEES -> "Reportees"
+                                        PeopleTab.STAKEHOLDERS -> "Stakeholders"
+                                    },
+                                )
+                            },
+                        )
+                    }
+                }
+
+                if (filteredPeople.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        EmptyStateCard(
+                            title = when (selectedTab) {
+                                PeopleTab.REPORTEES -> "No reportees yet"
+                                PeopleTab.STAKEHOLDERS -> "No stakeholders yet"
+                            },
+                            body = when (selectedTab) {
+                                PeopleTab.REPORTEES -> "Add the people you manage here so their interactions stay grouped together."
+                                PeopleTab.STAKEHOLDERS -> "Add cross-functional partners and leadership stakeholders here for cleaner tracking."
+                            },
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(filteredPeople) { person ->
+                            PersonCard(
+                                person = person,
+                                onClick = { onOpenPerson(person.id) },
+                                onEdit = { onEvent(PeopleEvent.EditPerson(person)) },
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -420,6 +658,7 @@ fun PersonDetailScreen(
 fun MeetingEditorScreen(
     uiState: MeetingEditorUiState,
     onEvent: (MeetingEditorEvent) -> Unit,
+    onNavigateUp: () -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -427,6 +666,13 @@ fun MeetingEditorScreen(
         uiState.message?.let {
             snackbarHostState.showSnackbar(it)
             onEvent(MeetingEditorEvent.ConsumeMessage)
+        }
+    }
+
+    LaunchedEffect(uiState.completedEditVersion) {
+        if (uiState.completedEditVersion > 0) {
+            onEvent(MeetingEditorEvent.ConsumeCompletedEdit)
+            onNavigateUp()
         }
     }
 
@@ -490,7 +736,7 @@ fun MeetingEditorScreen(
                     placeholder = "Examples: 1:1, Stakeholder sync, Escalation review",
                 )
                 Spacer(modifier = Modifier.height(12.dp))
-                LabeledTextField(
+                DatePickerField(
                     label = "Meeting date",
                     value = uiState.meetingDateText,
                     onValueChange = { onEvent(MeetingEditorEvent.UpdateMeetingDate(it)) },
@@ -1085,6 +1331,76 @@ private fun SelectionCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DatePickerField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    allowClear: Boolean = false,
+) {
+    var isDialogOpen by remember { mutableStateOf(false) }
+
+    OutlinedTextField(
+        value = value,
+        onValueChange = {},
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { isDialogOpen = true },
+        readOnly = true,
+        label = { Text(label) },
+        placeholder = { Text(placeholder) },
+        trailingIcon = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (allowClear && value.isNotBlank()) {
+                    IconButton(onClick = { onValueChange("") }) {
+                        Icon(
+                            imageVector = Icons.Outlined.Clear,
+                            contentDescription = "Clear date",
+                        )
+                    }
+                }
+                IconButton(onClick = { isDialogOpen = true }) {
+                    Icon(
+                        imageVector = Icons.Outlined.DateRange,
+                        contentDescription = "Pick date",
+                    )
+                }
+            }
+        },
+    )
+
+    if (isDialogOpen) {
+        val datePickerState = androidx.compose.material3.rememberDatePickerState(
+            initialSelectedDateMillis = value.toIsoDateOrNull()?.toPickerUtcMillis(),
+        )
+
+        DatePickerDialog(
+            onDismissRequest = { isDialogOpen = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { selectedDate ->
+                            onValueChange(selectedDate.toIsoDateString())
+                        }
+                        isDialogOpen = false
+                    },
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { isDialogOpen = false }) {
+                    Text("Cancel")
+                }
+            },
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun LabeledTextField(
@@ -1347,11 +1663,12 @@ private fun ActionItemEditor(
                 onValueChange = onUpdateOwner,
                 placeholder = "Who is responsible?",
             )
-            LabeledTextField(
+            DatePickerField(
                 label = "Due date",
                 value = draft.dueDateText,
                 onValueChange = onUpdateDueDate,
                 placeholder = "YYYY-MM-DD",
+                allowClear = true,
             )
             ActionStatusSelector(
                 selected = draft.status,
@@ -1473,4 +1790,19 @@ private fun formatDate(epochMillis: Long): String {
         .atZone(ZoneId.systemDefault())
         .toLocalDate()
         .format(DateTimeFormatter.ofPattern("dd MMM yyyy"))
+}
+
+private fun String.toIsoDateOrNull(): LocalDate? {
+    return runCatching { LocalDate.parse(trim()) }.getOrNull()
+}
+
+private fun LocalDate.toPickerUtcMillis(): Long {
+    return atStartOfDay(ZoneId.of("UTC")).toInstant().toEpochMilli()
+}
+
+private fun Long.toIsoDateString(): String {
+    return Instant.ofEpochMilli(this)
+        .atZone(ZoneId.of("UTC"))
+        .toLocalDate()
+        .toString()
 }

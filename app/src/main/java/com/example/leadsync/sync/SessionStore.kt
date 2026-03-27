@@ -8,6 +8,10 @@ class SessionStore(context: Context) {
     private val preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val sessionState = MutableStateFlow(readSession())
 
+    init {
+        migrateLegacyBaseUrl()
+    }
+
     val session: StateFlow<StoredSession?> = sessionState
 
     fun save(session: StoredSession) {
@@ -37,6 +41,12 @@ class SessionStore(context: Context) {
         } else {
             null
         }
+    }
+
+    private fun migrateLegacyBaseUrl() {
+        val session = sessionState.value ?: return
+        if (session.baseUrl != LEGACY_LOCAL_BACKEND_BASE_URL) return
+        save(session.copy(baseUrl = DEFAULT_BACKEND_BASE_URL))
     }
 
     private companion object {

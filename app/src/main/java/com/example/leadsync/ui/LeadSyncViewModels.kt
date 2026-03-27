@@ -17,6 +17,8 @@ import com.example.leadsync.data.PersonDraft
 import com.example.leadsync.data.PersonEntity
 import com.example.leadsync.data.PersonOverview
 import com.example.leadsync.data.PersonType
+import com.example.leadsync.sync.AutoSyncResult
+import com.example.leadsync.sync.CloudSyncCoordinator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -73,6 +75,7 @@ data class MeetingEditorUiState(
     val feedback: String = "",
     val actionItems: List<ActionItemDraftUiState> = listOf(ActionItemDraftUiState()),
     val message: String? = null,
+    val completedEditVersion: Int = 0,
 )
 
 data class PersonDetailUiState(
@@ -109,6 +112,7 @@ sealed interface MeetingEditorEvent {
     data class UpdateActionNotes(val index: Int, val value: String) : MeetingEditorEvent
     data object Save : MeetingEditorEvent
     data object ConsumeMessage : MeetingEditorEvent
+    data object ConsumeCompletedEdit : MeetingEditorEvent
 }
 
 class DashboardViewModel(
@@ -131,6 +135,7 @@ class DashboardViewModel(
 
 class PeopleViewModel(
     private val repository: LeadSyncRepository,
+    private val cloudSyncCoordinator: CloudSyncCoordinator,
 ) : ViewModel() {
     private val formState = MutableStateFlow(PeopleFormState())
 
@@ -196,21 +201,29 @@ class PeopleViewModel(
             } else {
                 repository.updatePerson(editingPersonId, draft)
             }
+            val message = buildAutoSyncMessage(
+                localSuccess = if (editingPersonId == null) "Person added." else "Person updated.",
+                autoSyncResult = cloudSyncCoordinator.pushLatestSnapshot(),
+            )
             formState.value = PeopleFormState(
-                message = if (editingPersonId == null) "Person added." else "Person updated.",
+                message = message,
             )
         }
     }
 
     companion object {
-        fun factory(repository: LeadSyncRepository): ViewModelProvider.Factory = viewModelFactory {
-            initializer { PeopleViewModel(repository) }
+        fun factory(
+            repository: LeadSyncRepository,
+            cloudSyncCoordinator: CloudSyncCoordinator,
+        ): ViewModelProvider.Factory = viewModelFactory {
+            initializer { PeopleViewModel(repository, cloudSyncCoordinator) }
         }
     }
 }
 
 class MeetingEditorViewModel(
     private val repository: LeadSyncRepository,
+    private val cloudSyncCoordinator: CloudSyncCoordinator,
     preselectedPersonId: Long?,
     editingMeetingId: Long?,
 ) : ViewModel() {
@@ -271,6 +284,7 @@ class MeetingEditorViewModel(
             is MeetingEditorEvent.UpdateActionNotes -> updateAction(event.index) { copy(notes = event.value) }
             MeetingEditorEvent.Save -> saveMeeting()
             MeetingEditorEvent.ConsumeMessage -> editorState.update { it.copy(message = null) }
+            MeetingEditorEvent.ConsumeCompletedEdit -> editorState.update { it.copy(completedEditVersion = 0) }
         }
     }
 
@@ -334,17 +348,26 @@ class MeetingEditorViewModel(
             val editingMeetingId = snapshot.editingMeetingId
             if (editingMeetingId == null) {
                 repository.addMeeting(draft)
+                val message = buildAutoSyncMessage(
+                    localSuccess = "Interaction saved.",
+                    autoSyncResult = cloudSyncCoordinator.pushLatestSnapshot(),
+                )
                 editorState.value = MeetingEditorUiState(
                     selectedPersonId = personId,
                     meetingDateText = LocalDate.now().toString(),
-                    message = "Interaction saved.",
+                    message = message,
                 )
             } else {
                 repository.updateMeeting(editingMeetingId, draft)
+                val message = buildAutoSyncMessage(
+                    localSuccess = "Interaction updated.",
+                    autoSyncResult = cloudSyncCoordinator.pushLatestSnapshot(),
+                )
                 editorState.value = snapshot.copy(
                     isLoading = false,
-                    message = "Interaction updated.",
+                    message = message,
                     actionItems = if (actionItems.isEmpty()) listOf(ActionItemDraftUiState()) else snapshot.actionItems,
+                    completedEditVersion = snapshot.completedEditVersion + 1,
                 )
             }
         }
@@ -403,10 +426,18 @@ class MeetingEditorViewModel(
     companion object {
         fun factory(
             repository: LeadSyncRepository,
+            cloudSyncCoordinator: CloudSyncCoordinator,
             preselectedPersonId: Long?,
             editingMeetingId: Long?,
         ): ViewModelProvider.Factory = viewModelFactory {
-            initializer { MeetingEditorViewModel(repository, preselectedPersonId, editingMeetingId) }
+            initializer {
+                MeetingEditorViewModel(
+                    repository = repository,
+                    cloudSyncCoordinator = cloudSyncCoordinator,
+                    preselectedPersonId = preselectedPersonId,
+                    editingMeetingId = editingMeetingId,
+                )
+            }
         }
     }
 }
@@ -448,4 +479,15 @@ private fun DashboardSummary.toUiState(): DashboardUiState {
         recentMeetings = recentMeetings,
         feedbackHighlights = feedbackHighlights,
     )
+}
+
+private fun buildAutoSyncMessage(
+    localSuccess: String,
+    autoSyncResult: AutoSyncResult,
+): String {
+    return when (autoSyncResult) {
+        AutoSyncResult.SkippedNoSession -> localSuccess
+        AutoSyncResult.Synced -> "$localSuccess Synced to cloud."
+        is AutoSyncResult.Failed -> "$localSuccess Saved locally, but cloud sync failed: ${autoSyncResult.message}"
+    }
 }

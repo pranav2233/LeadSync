@@ -7,6 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import com.example.leadsync.data.LeadSyncDatabase
 import com.example.leadsync.data.LeadSyncRepository
 import com.example.leadsync.sync.CloudApiService
+import com.example.leadsync.sync.CloudSyncCoordinator
 import com.example.leadsync.sync.SessionStore
 import com.example.leadsync.ui.LeadSyncApp
 import com.example.leadsync.ui.theme.LeadSyncTheme
@@ -25,6 +26,11 @@ class MainActivity : ComponentActivity() {
         )
         val sessionStore = SessionStore(applicationContext)
         val cloudApiService = CloudApiService()
+        val cloudSyncCoordinator = CloudSyncCoordinator(
+            repository = repository,
+            sessionStore = sessionStore,
+            cloudApiService = cloudApiService,
+        )
 
         setContent {
             LeadSyncTheme {
@@ -32,6 +38,7 @@ class MainActivity : ComponentActivity() {
                     repository = repository,
                     sessionStore = sessionStore,
                     cloudApiService = cloudApiService,
+                    cloudSyncCoordinator = cloudSyncCoordinator,
                 )
             }
         }
