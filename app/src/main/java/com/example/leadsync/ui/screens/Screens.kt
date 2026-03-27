@@ -1,5 +1,7 @@
 package com.example.leadsync.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -86,10 +88,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -114,6 +118,7 @@ import com.example.leadsync.data.MeetingRecord
 import com.example.leadsync.data.PersonEntity
 import com.example.leadsync.data.PersonOverview
 import com.example.leadsync.data.PersonType
+import com.example.leadsync.export.InteractionWorkbookExporter
 import com.example.leadsync.ui.ActionItemDraftUiState
 import com.example.leadsync.ui.DashboardUiState
 import com.example.leadsync.ui.MeetingEditorEvent
@@ -128,6 +133,9 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private enum class PeopleTab {
     REPORTEES,
@@ -433,13 +441,12 @@ private fun DashboardProfilePanel(
                     }
                 }
 
-            TextButton(
+            LinkTextButton(
+                text = "Logout",
                 onClick = onLogout,
                 enabled = !isSyncing,
                 modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Logout")
-            }
+            )
         }
     }
 }
@@ -571,7 +578,35 @@ fun PersonDetailScreen(
     onLogMeeting: () -> Unit,
     onEditMeeting: (Long) -> Unit,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var pendingExport by remember { mutableStateOf<Pair<String, ByteArray>?>(null) }
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument(personInteractionWorkbookMimeType),
+    ) { uri ->
+        val exportPayload = pendingExport
+        pendingExport = null
+        if (uri == null || exportPayload == null) {
+            return@rememberLauncherForActivityResult
+        }
+        scope.launch {
+            val resultMessage = runCatching {
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use { output ->
+                        output.write(exportPayload.second)
+                    } ?: error("Unable to open the selected location.")
+                }
+                "Excel export saved."
+            }.getOrElse { error ->
+                "Excel export failed: ${error.message ?: "Unknown error"}"
+            }
+            snackbarHostState.showSnackbar(resultMessage)
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -583,8 +618,20 @@ fun PersonDetailScreen(
                     }
                 },
                 actions = {
-                    TextButton(onClick = onLogMeeting) {
-                        Text("Log 1:1")
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        LinkTextButton(
+                            text = "Export",
+                            enabled = uiState.detail != null,
+                            onClick = {
+                                val detail = uiState.detail ?: return@LinkTextButton
+                                pendingExport = buildPersonInteractionExport(detail.person.name, detail.meetings)
+                                exportLauncher.launch(buildInteractionWorkbookFileName(detail.person.name))
+                            },
+                        )
+                        LinkTextButton(text = "Log 1:1", onClick = onLogMeeting)
                     }
                 },
             )
@@ -615,12 +662,15 @@ fun PersonDetailScreen(
         ) {
             item {
                 Card(
+                    modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
                     ),
                 ) {
                     Column(
-                        modifier = Modifier.padding(18.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(18.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(
@@ -985,9 +1035,7 @@ private fun MeetingTimelineCard(
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                     )
-                    TextButton(onClick = onEdit) {
-                        Text("Edit")
-                    }
+                    LinkTextButton(text = "Edit", onClick = onEdit)
                 }
             }
 
@@ -1647,6 +1695,28 @@ private fun RichToolbarButton(
     }
 }
 
+private val LinkButtonColor = Color(0xFF0178A4)
+
+@Composable
+private fun LinkTextButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    TextButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier,
+    ) {
+        Text(
+            text = text,
+            color = LinkButtonColor,
+            textDecoration = TextDecoration.Underline,
+        )
+    }
+}
+
 @Composable
 private fun NoteBlock(title: String, body: String) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -1793,9 +1863,7 @@ private fun ActionItemEditor(
                     fontWeight = FontWeight.SemiBold,
                 )
                 if (index > 0) {
-                    TextButton(onClick = onRemove) {
-                        Text("Remove")
-                    }
+                    LinkTextButton(text = "Remove", onClick = onRemove)
                 }
             }
             LabeledTextField(
@@ -1938,6 +2006,28 @@ private fun formatDate(epochMillis: Long): String {
         .toLocalDate()
         .format(DateTimeFormatter.ofPattern("dd MMM yyyy"))
 }
+
+private fun buildPersonInteractionExport(
+    personName: String,
+    meetings: List<MeetingRecord>,
+): Pair<String, ByteArray> {
+    return buildInteractionWorkbookFileName(personName) to InteractionWorkbookExporter.export(
+        personName = personName,
+        meetings = meetings.sortedByDescending { it.scheduledAt },
+    )
+}
+
+private fun buildInteractionWorkbookFileName(personName: String): String {
+    val safeName = personName
+        .trim()
+        .replace(Regex("""[^A-Za-z0-9_-]+"""), "_")
+        .trim('_')
+        .ifBlank { "person" }
+    return "${safeName}_interactions.xlsx"
+}
+
+private const val personInteractionWorkbookMimeType =
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 private fun String.toIsoDateOrNull(): LocalDate? {
     return runCatching { LocalDate.parse(trim()) }.getOrNull()

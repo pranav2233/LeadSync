@@ -1,8 +1,8 @@
 <resources>
-    <color name="brand_navy">#183153</color>
-    <color name="brand_teal">#37D6C4</color>
-    <color name="brand_gold">#FFBF47</color>
-    <color name="brand_coral">#FF7A59</color>
-    <color name="brand_cream">#F3EEE5</color>
-    <color name="ic_launcher_background">#F3EEE5</color>
+    <color name="brand_navy">#0178A4</color>
+    <color name="brand_teal">#0178A4</color>
+    <color name="brand_gold">#F0F4F5</color>
+    <color name="brand_coral">#F0F4F5</color>
+    <color name="brand_cream">#FFFFFF</color>
+    <color name="ic_launcher_background">#FFFFFF</color>
 </resources>
