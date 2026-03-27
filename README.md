@@ -28,15 +28,18 @@ Repository: `https://github.com/pranav2233/LeadSync`
 ## Project structure
 
 - `app/src/main/java/com/example/leadsync/data`: Room entities, DAOs, repository
+- `app/src/main/java/com/example/leadsync/sync`: cloud auth/session/snapshot sync client
 - `app/src/main/java/com/example/leadsync/ui`: navigation and ViewModels
 - `app/src/main/java/com/example/leadsync/ui/screens`: Compose screens and reusable form components
 - `app/src/main/java/com/example/leadsync/ui/theme`: colors and typography
+- `backend`: separate Kotlin + Spring Boot backend repo for auth + snapshot sync
 
 ## Open locally
 
 1. Open the project in Android Studio.
 2. Let Gradle sync and download dependencies.
-3. Run the `app` configuration on an emulator or device with API 26+.
+3. Start the backend from `backend/README.md`.
+4. Run the `app` configuration on an emulator or device with API 26+.
 
 ## Notes
 

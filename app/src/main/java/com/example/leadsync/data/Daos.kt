@@ -12,11 +12,17 @@ interface PersonDao {
     @Query("SELECT * FROM people ORDER BY name COLLATE NOCASE")
     fun observePeople(): Flow<List<PersonEntity>>
 
+    @Query("SELECT * FROM people ORDER BY id ASC")
+    suspend fun getAllPeople(): List<PersonEntity>
+
     @Query("SELECT * FROM people WHERE id = :personId")
     fun observePerson(personId: Long): Flow<PersonEntity?>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPerson(person: PersonEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPeople(people: List<PersonEntity>)
 
     @Query(
         """
@@ -37,6 +43,9 @@ interface PersonDao {
         personType: String,
         notes: String,
     )
+
+    @Query("DELETE FROM people")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -61,12 +70,18 @@ interface MeetingDao {
     )
     fun observeMeetingsForPerson(personId: Long): Flow<List<MeetingWithActions>>
 
+    @Query("SELECT * FROM meetings ORDER BY id ASC")
+    suspend fun getAllMeetings(): List<MeetingEntity>
+
     @Transaction
     @Query("SELECT * FROM meetings WHERE id = :meetingId")
     suspend fun getMeetingWithActions(meetingId: Long): MeetingWithActions?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMeeting(meeting: MeetingEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMeetings(meetings: List<MeetingEntity>)
 
     @Query(
         """
@@ -89,6 +104,9 @@ interface MeetingDao {
         progressSummary: String,
         feedback: String,
     )
+
+    @Query("DELETE FROM meetings")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -112,9 +130,15 @@ interface ActionItemDao {
     )
     fun observeActionSummaries(): Flow<List<ActionItemSummaryRow>>
 
+    @Query("SELECT * FROM action_items ORDER BY id ASC")
+    suspend fun getAllActionItems(): List<ActionItemEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertActionItems(actionItems: List<ActionItemEntity>)
 
     @Query("DELETE FROM action_items WHERE meetingId = :meetingId")
     suspend fun deleteForMeeting(meetingId: Long)
+
+    @Query("DELETE FROM action_items")
+    suspend fun deleteAll()
 }

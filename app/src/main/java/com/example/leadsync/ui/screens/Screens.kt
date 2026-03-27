@@ -94,6 +94,12 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun DashboardScreen(
     uiState: DashboardUiState,
+    cloudEmail: String,
+    cloudStatus: String?,
+    isSyncing: Boolean,
+    onPushSync: () -> Unit,
+    onPullSync: () -> Unit,
+    onLogout: () -> Unit,
     onOpenPeople: () -> Unit,
     onLogMeeting: (Long?) -> Unit,
     onOpenPerson: (Long) -> Unit,
@@ -117,6 +123,11 @@ fun DashboardScreen(
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Text(
+                    text = "Cloud account: $cloudEmail",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(onClick = onOpenPeople) {
                         Icon(Icons.Outlined.Groups, contentDescription = null)
@@ -128,6 +139,24 @@ fun DashboardScreen(
                         Spacer(modifier = Modifier.size(8.dp))
                         Text("Log interaction")
                     }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(onClick = onPullSync, enabled = !isSyncing) {
+                        Text(if (isSyncing) "Working..." else "Pull cloud")
+                    }
+                    OutlinedButton(onClick = onPushSync, enabled = !isSyncing) {
+                        Text(if (isSyncing) "Working..." else "Push cloud")
+                    }
+                    TextButton(onClick = onLogout, enabled = !isSyncing) {
+                        Text("Logout")
+                    }
+                }
+                cloudStatus?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }

@@ -7,3 +7,4 @@ captures/
 app/build/
 app/schemas/
 *.iml
+backend/

@@ -1,5 +1,6 @@
 package com.example.leadsync.data
 
+import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import java.time.Instant
@@ -83,6 +84,7 @@ data class EditableMeeting(
 )
 
 class LeadSyncRepository(
+    private val database: LeadSyncDatabase,
     private val personDao: PersonDao,
     private val meetingDao: MeetingDao,
     private val actionItemDao: ActionItemDao,
@@ -289,6 +291,32 @@ class LeadSyncRepository(
         }
     }
 
+    suspend fun exportSnapshot(): LeadSyncSnapshot {
+        return LeadSyncSnapshot(
+            people = personDao.getAllPeople(),
+            meetings = meetingDao.getAllMeetings(),
+            actionItems = actionItemDao.getAllActionItems(),
+        )
+    }
+
+    suspend fun replaceSnapshot(snapshot: LeadSyncSnapshot) {
+        database.withTransaction {
+            actionItemDao.deleteAll()
+            meetingDao.deleteAll()
+            personDao.deleteAll()
+
+            if (snapshot.people.isNotEmpty()) {
+                personDao.insertPeople(snapshot.people)
+            }
+            if (snapshot.meetings.isNotEmpty()) {
+                meetingDao.insertMeetings(snapshot.meetings)
+            }
+            if (snapshot.actionItems.isNotEmpty()) {
+                actionItemDao.insertActionItems(snapshot.actionItems)
+            }
+        }
+    }
+
     private fun parseDateToEpochMillis(input: String): Long {
         val date = LocalDate.parse(input.trim())
         return date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
@@ -298,3 +326,9 @@ class LeadSyncRepository(
         return Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).toLocalDate()
     }
 }
+
+data class LeadSyncSnapshot(
+    val people: List<PersonEntity>,
+    val meetings: List<MeetingEntity>,
+    val actionItems: List<ActionItemEntity>,
+)

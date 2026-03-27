@@ -24,7 +24,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.leadsync.data.LeadSyncRepository
+import com.example.leadsync.sync.CloudApiService
+import com.example.leadsync.sync.SessionStore
 import com.example.leadsync.ui.screens.DashboardScreen
+import com.example.leadsync.ui.screens.LoginScreen
 import com.example.leadsync.ui.screens.MeetingEditorScreen
 import com.example.leadsync.ui.screens.PeopleScreen
 import com.example.leadsync.ui.screens.PersonDetailScreen
@@ -54,8 +57,23 @@ private enum class TopLevelDestination(
 @Composable
 fun LeadSyncApp(
     repository: LeadSyncRepository,
+    sessionStore: SessionStore,
+    cloudApiService: CloudApiService,
     navController: NavHostController = rememberNavController(),
 ) {
+    val sessionViewModel: SessionViewModel = viewModel(
+        factory = SessionViewModel.factory(repository, sessionStore, cloudApiService),
+    )
+    val sessionUiState by sessionViewModel.uiState.collectAsStateWithLifecycle()
+
+    if (!sessionUiState.isAuthenticated) {
+        LoginScreen(
+            uiState = sessionUiState,
+            onEvent = sessionViewModel::onEvent,
+        )
+        return
+    }
+
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
     val topLevelDestinations = TopLevelDestination.entries
@@ -98,6 +116,12 @@ fun LeadSyncApp(
                 val uiState by viewModel.uiState.collectAsStateWithLifecycle()
                 DashboardScreen(
                     uiState = uiState,
+                    cloudEmail = sessionUiState.session?.email.orEmpty(),
+                    cloudStatus = sessionUiState.message,
+                    isSyncing = sessionUiState.isWorking,
+                    onPushSync = { sessionViewModel.onEvent(SessionEvent.PushSync) },
+                    onPullSync = { sessionViewModel.onEvent(SessionEvent.PullSync) },
+                    onLogout = { sessionViewModel.onEvent(SessionEvent.Logout) },
                     onOpenPeople = { navController.navigate(TopLevelDestination.PEOPLE.baseRoute) },
                     onLogMeeting = { personId ->
                         navController.navigate(captureRoute(personId = personId))
