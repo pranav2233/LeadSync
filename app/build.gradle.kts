@@ -74,6 +74,7 @@ dependencies {
     implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
+    implementation(libs.compose.rich.editor)
     ksp(libs.androidx.room.compiler)
 
     implementation(platform(libs.androidx.compose.bom))

@@ -6,8 +6,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -33,8 +38,15 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Clear
+import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.FormatBold
+import androidx.compose.material.icons.outlined.FormatItalic
+import androidx.compose.material.icons.outlined.FormatListBulleted
+import androidx.compose.material.icons.outlined.FormatListNumbered
+import androidx.compose.material.icons.outlined.FormatStrikethrough
+import androidx.compose.material.icons.outlined.FormatUnderlined
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.outlined.Schedule
@@ -49,8 +61,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -72,8 +86,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -105,6 +121,9 @@ import com.example.leadsync.ui.MeetingEditorUiState
 import com.example.leadsync.ui.PeopleEvent
 import com.example.leadsync.ui.PeopleUiState
 import com.example.leadsync.ui.PersonDetailUiState
+import com.mohamedrejeb.richeditor.model.rememberRichTextState
+import com.mohamedrejeb.richeditor.ui.material3.RichTextEditor
+import com.mohamedrejeb.richeditor.ui.material3.RichTextEditorDefaults
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -1411,6 +1430,17 @@ private fun LabeledTextField(
     minLines: Int = 1,
     enableRichText: Boolean = false,
 ) {
+    if (enableRichText) {
+        RichMarkdownEditorField(
+            label = label,
+            value = value,
+            onValueChange = onValueChange,
+            placeholder = placeholder,
+            minLines = minLines,
+        )
+        return
+    }
+
     var textFieldValue by remember { mutableStateOf(TextFieldValue(value)) }
 
     LaunchedEffect(value) {
@@ -1439,64 +1469,181 @@ private fun LabeledTextField(
             placeholder = { Text(placeholder) },
             minLines = minLines,
         )
+    }
+}
 
-        if (enableRichText) {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                RichTextActionChip("B") {
-                    val updated = applyWrappedStyle(textFieldValue, "**", "**")
-                    textFieldValue = updated
-                    onValueChange(updated.text)
-                }
-                RichTextActionChip("I") {
-                    val updated = applyWrappedStyle(textFieldValue, "_", "_")
-                    textFieldValue = updated
-                    onValueChange(updated.text)
-                }
-                RichTextActionChip("U") {
-                    val updated = applyWrappedStyle(textFieldValue, "<u>", "</u>")
-                    textFieldValue = updated
-                    onValueChange(updated.text)
-                }
-                RichTextActionChip("S") {
-                    val updated = applyWrappedStyle(textFieldValue, "~~", "~~")
-                    textFieldValue = updated
-                    onValueChange(updated.text)
-                }
-                RichTextActionChip("Code") {
-                    val updated = applyWrappedStyle(textFieldValue, "`", "`")
-                    textFieldValue = updated
-                    onValueChange(updated.text)
-                }
-                RichTextActionChip("H1") {
-                    val updated = applyLinePrefix(textFieldValue, "# ")
-                    textFieldValue = updated
-                    onValueChange(updated.text)
-                }
-                RichTextActionChip("H2") {
-                    val updated = applyLinePrefix(textFieldValue, "## ")
-                    textFieldValue = updated
-                    onValueChange(updated.text)
-                }
-                RichTextActionChip("• List") {
-                    val updated = applyLinePrefix(textFieldValue, "- ")
-                    textFieldValue = updated
-                    onValueChange(updated.text)
-                }
-                RichTextActionChip("1. List") {
-                    val updated = applyNumberedLinePrefix(textFieldValue)
-                    textFieldValue = updated
-                    onValueChange(updated.text)
-                }
-                RichTextActionChip("Quote") {
-                    val updated = applyLinePrefix(textFieldValue, "> ")
-                    textFieldValue = updated
-                    onValueChange(updated.text)
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RichMarkdownEditorField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    minLines: Int,
+) {
+    val richTextState = rememberRichTextState()
+    val interactionSource = remember { MutableInteractionSource() }
+    val isEditorFocused by interactionSource.collectIsFocusedAsState()
+    val latestValue by rememberUpdatedState(value)
+    val latestOnValueChange by rememberUpdatedState(onValueChange)
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
+    val outlineColor = if (isEditorFocused) {
+        primaryColor.copy(alpha = 0.45f)
+    } else {
+        MaterialTheme.colorScheme.outline.copy(alpha = 0.75f)
+    }
+    val editorShape = RoundedCornerShape(18.dp)
+    var isApplyingExternalValue by remember { mutableStateOf(false) }
+
+    LaunchedEffect(value) {
+        if (richTextState.toMarkdown() != value) {
+            isApplyingExternalValue = true
+            richTextState.setMarkdown(value)
+            isApplyingExternalValue = false
+        }
+    }
+
+    LaunchedEffect(richTextState) {
+        snapshotFlow { richTextState.toMarkdown() }
+            .collect { markdown ->
+                if (!isApplyingExternalValue && markdown != latestValue) {
+                    latestOnValueChange(markdown)
                 }
             }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        AnimatedVisibility(visible = isEditorFocused) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                RichToolbarButton(
+                    icon = Icons.Outlined.FormatBold,
+                    contentDescription = "Bold",
+                    selected = richTextState.currentSpanStyle.fontWeight == FontWeight.Bold,
+                    onClick = { richTextState.toggleSpanStyle(SpanStyle(fontWeight = FontWeight.Bold)) },
+                )
+                RichToolbarButton(
+                    icon = Icons.Outlined.FormatItalic,
+                    contentDescription = "Italic",
+                    selected = richTextState.currentSpanStyle.fontStyle == FontStyle.Italic,
+                    onClick = { richTextState.toggleSpanStyle(SpanStyle(fontStyle = FontStyle.Italic)) },
+                )
+                RichToolbarButton(
+                    icon = Icons.Outlined.FormatUnderlined,
+                    contentDescription = "Underline",
+                    selected = richTextState.currentSpanStyle.textDecoration?.contains(TextDecoration.Underline) == true,
+                    onClick = { richTextState.toggleSpanStyle(SpanStyle(textDecoration = TextDecoration.Underline)) },
+                )
+                RichToolbarButton(
+                    icon = Icons.Outlined.FormatStrikethrough,
+                    contentDescription = "Strikethrough",
+                    selected = richTextState.currentSpanStyle.textDecoration?.contains(TextDecoration.LineThrough) == true,
+                    onClick = { richTextState.toggleSpanStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) },
+                )
+                RichToolbarButton(
+                    icon = Icons.Outlined.Code,
+                    contentDescription = "Code",
+                    selected = false,
+                    onClick = { richTextState.toggleCodeSpan() },
+                )
+                RichToolbarButton(
+                    icon = Icons.Outlined.FormatListBulleted,
+                    contentDescription = "Bulleted list",
+                    selected = false,
+                    onClick = { richTextState.toggleUnorderedList() },
+                )
+                RichToolbarButton(
+                    icon = Icons.Outlined.FormatListNumbered,
+                    contentDescription = "Numbered list",
+                    selected = false,
+                    onClick = { richTextState.toggleOrderedList() },
+                )
+            }
         }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = editorShape,
+            color = surfaceVariant.copy(alpha = 0.3f),
+            border = BorderStroke(1.dp, outlineColor),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = (minLines * 24 + 24).dp)
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+            ) {
+                if (value.isBlank()) {
+                    Text(
+                        text = placeholder,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                RichTextEditor(
+                    state = richTextState,
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = onSurfaceColor),
+                    minLines = minLines,
+                    interactionSource = interactionSource,
+                    colors = RichTextEditorDefaults.richTextEditorColors(
+                        containerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        disabledIndicatorColor = Color.Transparent,
+                        errorIndicatorColor = Color.Transparent,
+                    ),
+                )
+            }
+        }
+
+        Text(
+            text = "Formatting is saved as Markdown and synced with your existing notes.",
+            style = MaterialTheme.typography.bodySmall,
+            color = primaryColor,
+        )
+    }
+}
+
+@Composable
+private fun RichToolbarButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    FilledTonalIconButton(
+        onClick = onClick,
+        colors = IconButtonDefaults.filledTonalIconButtonColors(
+            containerColor = if (selected) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant
+            },
+            contentColor = if (selected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        ),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+        )
     }
 }
 
